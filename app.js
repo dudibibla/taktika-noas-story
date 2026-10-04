@@ -358,18 +358,34 @@ const NoaWizard = {
     return (this.fieldConfig[stepKey] || []).every(f => this.confirmed[f.key]);
   },
 
+  // Returns what's still missing on a step (empty string = ready to continue)
+  missingForStep(stepKey) {
+    if (!this.photos[stepKey]) return 'צריך לצלם או לבחור תמונה של המסמך (ולחכות רגע שנקרא אותו)';
+    if (!this.allFieldsConfirmed(stepKey)) return 'לחצו "✓ נכון" (או "✏️ לתקן") ליד כל אחד מהפרטים שזיהינו';
+    if (stepKey === 'id') {
+      const digits = (this.data.govPhone || '').replace(/\D/g, '');
+      if (digits.length < 9) return 'צריך למלא מספר טלפון נייד תקין';
+    }
+    if (stepKey === 'contract' && this.data.whoFills === 'other' && !this.data.poaPhoto) {
+      return 'צריך לצרף ייפוי כוח חתום';
+    }
+    return '';
+  },
+
+  // Button stays clickable (looks locked) so a click can explain what's missing
   updateNextButton(stepKey) {
     const btn = document.getElementById(`btn-next-${stepKey}`);
     if (!btn) return;
-    let ready = this.photos[stepKey] && this.allFieldsConfirmed(stepKey);
-    if (stepKey === 'id' && ready) {
-      const digits = (this.data.govPhone || '').replace(/\D/g, '');
-      if (digits.length < 9) ready = false;
+    btn.classList.toggle('noa-btn-locked', !!this.missingForStep(stepKey));
+  },
+
+  tryGoToStep(stepKey, stepIndex) {
+    const missing = this.missingForStep(stepKey);
+    if (missing) {
+      App.showToast(`כמעט! ${missing}`, 'warning');
+      return;
     }
-    if (stepKey === 'contract' && ready) {
-      if (this.data.whoFills === 'other' && !this.data.poaPhoto) ready = false;
-    }
-    btn.disabled = !ready;
+    this.goToStep(stepIndex);
   },
 
   updateContact() {
@@ -619,6 +635,7 @@ const NoaWizard = {
     this.data = { fullName: '', govId: '', address: '', govPhone: '', govEmail: '', contractAddress: '', entryDate: '', landlordName: '', landlordPhone: '', tenantNameContract: '', whoFills: 'me', poaPhoto: false, meterReading: '', consumerNumber: '', waterCardNumber: '', meterDate: '', occupantsCount: null, additionalResidents: [], declarationConfirmed: false };
     this.confirmed = {};
     this.photos = { id: false, contract: false, meter: false };
+    ['id', 'contract', 'meter'].forEach(stepKey => this.updateNextButton(stepKey));
     localStorage.removeItem('noaFlowProgress');
     this.goToStep(0);
   },
